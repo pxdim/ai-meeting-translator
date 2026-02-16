@@ -1,16 +1,23 @@
+# 建置階段
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# 運行階段
 FROM node:20-alpine
 
 WORKDIR /app
 
-# 安裝所有依賴 (包括 devDependencies for build)
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --only=production
 
-# 建置 TypeScript
-RUN npm run build
-
-# 複製其餘檔案
-COPY . .
+COPY --from=builder /app/dist ./dist
 
 EXPOSE 3001
 

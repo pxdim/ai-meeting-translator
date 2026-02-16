@@ -1,13 +1,25 @@
+# 建置階段
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# 運行階段
 FROM node:20-alpine
 
 WORKDIR /app
 
-# 安裝所有依賴
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --only=production
 
-# 建置 Next.js
-RUN npm run build
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
 
 EXPOSE 3000
 
