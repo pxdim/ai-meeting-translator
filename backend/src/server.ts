@@ -178,8 +178,25 @@ const server = createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not found' }));
 });
 
-// 建立 WebSocket 伺服器
-const wss = new WebSocketServer({ server, path: '/ws' });
+// 處理 WebSocket 升級請求
+server.on('upgrade', (request, socket, head) => {
+  try {
+    const { pathname } = new URL(request.url || '', `http://${request.headers.host}`);
+
+    if (pathname === '/' || pathname === '/ws') {
+      wss.handleUpgrade(request, socket as any, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
+  } catch (error) {
+    socket.destroy();
+  }
+});
+
+// 建立 WebSocket 伺服器 (使用 noServer 手動處理升級)
+const wss = new WebSocketServer({ noServer: true, path: '/' });
 
 // WebSocket 連線處理
 wss.on('connection', (ws: WebSocket, req) => {
