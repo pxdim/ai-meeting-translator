@@ -122,7 +122,7 @@ export function RecordingButton({
 
 // 狀態指示器
 interface StatusIndicatorProps {
-  status: 'connected' | 'disconnected' | 'connecting';
+  status: 'connected' | 'disconnected' | 'connecting' | 'processing';
   className?: string;
 }
 
@@ -131,6 +131,7 @@ export function StatusIndicator({ status, className = '' }: StatusIndicatorProps
     connected: { color: 'bg-green-500', text: '已連線', pulse: true },
     disconnected: { color: 'bg-gray-400', text: '未連線', pulse: false },
     connecting: { color: 'bg-yellow-500', text: '連線中...', pulse: true },
+    processing: { color: 'bg-blue-500', text: '處理中...', pulse: true },
   };
 
   const config = statusConfig[status];

@@ -140,7 +140,12 @@ export class AudioRecorder {
 
 // 檢查瀏覽器支援
 export function isAudioRecordingSupported(): boolean {
-  return !!(navigator.mediaDevices?.getUserMedia && MediaRecorder);
+  if (typeof navigator === 'undefined' || !navigator.mediaDevices) {
+    return false;
+  }
+  const hasGetUserMedia = typeof navigator.mediaDevices.getUserMedia === 'function';
+  const hasMediaRecorder = typeof window.MediaRecorder === 'function';
+  return hasGetUserMedia && hasMediaRecorder;
 }
 
 // 取得麥克風權限狀態

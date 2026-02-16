@@ -22,7 +22,7 @@ export default function RecordingPage() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [duration, setDuration] = useState(0);
   const [transcripts, setTranscripts] = useState<TranscriptSegment[]>([]);
-  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting' | 'processing'>('disconnected');
   const [meetingId, setMeetingId] = useState('');
 
   const wsClientRef = useRef<WebSocketClient | null>(null);
