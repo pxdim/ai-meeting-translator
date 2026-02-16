@@ -9,7 +9,7 @@ export interface Meeting {
   duration: number;
   audio_path: string;
   summary?: string;
-  action_items?: string[];
+  action_items?: string[];  // 資料庫欄位是 action_items (snake_case)
 }
 
 export interface TranscriptSegment {
@@ -97,7 +97,7 @@ export class SupabaseDatabase {
     if (updates.title !== undefined) updateData.title = updates.title;
     if (updates.duration !== undefined) updateData.duration = updates.duration;
     if (updates.summary !== undefined) updateData.summary = updates.summary;
-    if (updates.actionItems !== undefined) updateData.action_items = updates.actionItems;
+    if (updates.action_items !== undefined) updateData.action_items = updates.action_items;
 
     const { error } = await this.client
       .from('meetings')
@@ -161,6 +161,18 @@ export class SupabaseDatabase {
     }
 
     return data || [];
+  }
+
+  async updateSegmentTranslation(segmentId: string, translation: string): Promise<void> {
+    const { error } = await this.client
+      .from('transcript_segments')
+      .update({ text_en: translation })
+      .eq('id', segmentId);
+
+    if (error) {
+      console.error('[Supabase] Error updating segment translation:', error);
+      throw error;
+    }
   }
 
   async getMeetingWithSegments(meetingId: string): Promise<{

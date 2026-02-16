@@ -112,8 +112,8 @@ async function startRecording(
     audioPath,
   });
 
-  // 追蹤待處理的翻譯
-  const pendingTranslations = new Map<string, string>();
+  // 追蹤待處理的翻譯 - segmentId -> { translation, originalSegment }
+  const pendingTranslations = new Map<string, { translation: string; segment: any }>();
 
   // 處理 Deepgram 結果
   deepgramWs.on(LiveTranscriptionEvents.Transcript, async (data: any) => {
@@ -126,22 +126,31 @@ async function startRecording(
     // 翻譯成英文（使用 Gemini）
     let translatedText = '';
     if (isFinal) {
+      // 先用佔位符
+      translatedText = '[翻譯中...]';
+
       // 非同步翻譯，不阻塞
       gemini.translateText(transcript, 'zh')
-        .then(result => {
-          translatedText = result;
-          pendingTranslations.set(segmentId, result);
-
+        .then(async (result) => {
           // 更新資料庫中的翻譯
-          db.updateMeeting(actualMeetingId, {}); // 觸發更新
+          try {
+            // 更新資料庫中的翻譯
+            await db.updateSegmentTranslation(segmentId, result);
+
+            // 發送更新後的翻譯到客戶端
+            ws.send(JSON.stringify({
+              type: 'transcript_update',
+              segmentId,
+              translation: result,
+            }));
+          } catch (error) {
+            console.error('[DB] Failed to update translation:', error);
+          }
         })
         .catch(error => {
           console.error('[Gemini] Translation error:', error);
-          translatedText = '';
+          // 翻譯失敗時保持原中文
         });
-
-      // 先用佔位符
-      translatedText = '[翻譯中...]';
     }
 
     const segment = {
@@ -253,7 +262,7 @@ async function stopRecording(ws: WebSocket, db: SupabaseDatabase): Promise<void>
 
       await db.updateMeeting(session.meetingId, {
         summary,
-        actionItems,
+        action_items: actionItems,
       });
     } catch (error) {
       console.error('[Gemini] Failed to generate summary:', error);

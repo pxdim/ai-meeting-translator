@@ -10,7 +10,7 @@ import { RecordingButton, RecordingTimer, StatusIndicator } from '@/components/R
 import { TranscriptDisplay } from '@/components/TranscriptDisplay';
 import { WebSocketClient } from '@/lib/websocket';
 import { AudioRecorder } from '@/lib/audio-recorder';
-import type { TranscriptSegment, WSMessage, WSTranscriptMessage } from '@/types/meeting';
+import type { TranscriptSegment, WSMessage, WSTranscriptMessage, WSTranscriptUpdateMessage } from '@/types/meeting';
 import { ArrowLeft, Pause, Play } from 'lucide-react';
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
@@ -68,6 +68,25 @@ export default function RecordingPage() {
             return updated;
           }
           return [...prev, segment];
+        });
+        break;
+      case 'transcript_update':
+        // 更新翻譯結果
+        setTranscripts(prev => {
+          const updateMsg = message as WSTranscriptUpdateMessage;
+          const existingIndex = prev.findIndex(s => s.id === updateMsg.segmentId);
+          if (existingIndex >= 0) {
+            const updated = [...prev];
+            updated[existingIndex] = {
+              ...updated[existingIndex],
+              text: {
+                ...updated[existingIndex].text,
+                en: updateMsg.translation,
+              },
+            };
+            return updated;
+          }
+          return prev;
         });
         break;
       case 'meeting_complete':

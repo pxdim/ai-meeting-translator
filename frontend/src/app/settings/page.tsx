@@ -12,13 +12,13 @@ import { ArrowLeft, Save, Key } from 'lucide-react';
 
 export default function SettingsPage() {
   const [deepgramKey, setDeepgramKey] = useState('');
-  const [openaiKey, setOpenaiKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
   const [wsUrl, setWsUrl] = useState('ws://localhost:3001');
 
   const handleSave = () => {
     // 儲存到 localStorage（僅用於開發）
     localStorage.setItem('deepgram_api_key', deepgramKey);
-    localStorage.setItem('openai_api_key', openaiKey);
+    localStorage.setItem('gemini_api_key', geminiKey);
     localStorage.setItem('ws_url', wsUrl);
     alert('設定已儲存！');
   };
@@ -67,20 +67,20 @@ export default function SettingsPage() {
               </p>
             </div>
 
-            {/* OpenAI API */}
+            {/* Gemini API */}
             <div className="space-y-2">
-              <label htmlFor="openai-key" className="text-sm font-medium">
-                OpenAI API 金鑰
+              <label htmlFor="gemini-key" className="text-sm font-medium">
+                Google Gemini API 金鑰
               </label>
               <Input
-                id="openai-key"
+                id="gemini-key"
                 type="password"
-                placeholder="sk-..."
-                value={openaiKey}
-                onChange={(e) => setOpenaiKey(e.target.value)}
+                placeholder="AIza..."
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                用於翻譯和會議摘要。前往 <a href="https://platform.openai.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">platform.openai.com</a> 獲取金鑰。
+                用於翻譯和會議摘要。前往 <a href="https://ai.google.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">ai.google.dev</a> 獲取金鑰。
               </p>
             </div>
 

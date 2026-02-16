@@ -21,16 +21,16 @@ export class DeepgramService {
     const {
       language = 'zh-CN',
       punctuate = true,
-      smart_format = true,
-      interim_results = true,
+      smartFormat = true,
+      interimResults = true,
     } = options;
 
     return this.client.listen.live({
       model: 'nova-2',
       language,
       punctuate,
-      smart_format: smart_format,
-      interim_results: interim_results,
+      smartFormat: smartFormat,
+      interimResults: interimResults,
       profanity_filter: false,
       filler_words: true,
       encoding: 'linear16',
@@ -52,7 +52,7 @@ export class DeepgramService {
         model: 'nova-2',
         language,
         punctuate,
-        smart_format: true,
+        smartFormat: true,
       });
 
       return result;

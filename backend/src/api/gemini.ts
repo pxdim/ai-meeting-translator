@@ -5,7 +5,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 /**
  * 推薦的 Gemini 模型：
  *
- * gemini-2.0-flash-exp
+ * gemini-2.0-flash
  *   - 最新實驗性模型
  *   - 極快回應速度 (< 1秒)
  *   - 免費使用

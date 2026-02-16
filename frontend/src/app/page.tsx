@@ -12,14 +12,50 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Settings, History } from 'lucide-react';
 import type { Meeting } from '@/types/meeting';
 
-// 模擬的會議資料（之後會從 API 獲取）
-const mockMeetings: Meeting[] = [
-  // 之後替換為真實資料
-];
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function HomePage() {
   const router = useRouter();
   const [isConnected, setIsConnected] = useState(false);
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // 獲取最近會議
+  useEffect(() => {
+    const fetchMeetings = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/meetings?limit=5`);
+
+        if (!response.ok) {
+          throw new Error('無法載入會議列表');
+        }
+
+        const data = await response.json();
+
+        // 轉換資料格式
+        const formattedMeetings: Meeting[] = data.map((m: any) => ({
+          id: m.id,
+          title: m.title,
+          createdAt: new Date(m.created_at),
+          duration: m.duration,
+          audioPath: m.audio_path,
+          transcript: [], // 首頁不載入逐字稿
+          summary: m.summary,
+          actionItems: m.action_items || [],
+        }));
+
+        setMeetings(formattedMeetings);
+      } catch (err) {
+        console.error('Error fetching meetings:', err);
+        setError(err instanceof Error ? err.message : '載入失敗');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMeetings();
+  }, []);
 
   // 開始錄音 - 導航到錄音頁面
   const handleStartRecording = () => {
@@ -81,7 +117,19 @@ export default function HomePage() {
               </Link>
             </Button>
           </div>
-          <MeetingList meetings={mockMeetings} />
+
+          {loading ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p>載入中...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>{error}</p>
+            </div>
+          ) : (
+            <MeetingList meetings={meetings} />
+          )}
         </section>
       </main>
 

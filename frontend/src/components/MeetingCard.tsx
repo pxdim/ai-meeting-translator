@@ -42,7 +42,7 @@ export function MeetingCard({ meeting, onDelete, className = '' }: MeetingCardPr
 
   const getWordCount = (): number => {
     return meeting.transcript.reduce((count, segment) => {
-      return count + segment.text.zh.split('').length;
+      return count + segment.text.zh.split(/\s+/).length;
     }, 0);
   };
 

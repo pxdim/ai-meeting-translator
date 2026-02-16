@@ -27,6 +27,7 @@ export interface TranscriptSegment {
 export type WSMessage =
   | WSStatusMessage
   | WSTranscriptMessage
+  | WSTranscriptUpdateMessage
   | WSMeetingCompleteMessage
   | WSErrorMessage;
 
@@ -38,6 +39,12 @@ export interface WSStatusMessage {
 export interface WSTranscriptMessage {
   type: 'transcript';
   segment: TranscriptSegment;
+}
+
+export interface WSTranscriptUpdateMessage {
+  type: 'transcript_update';
+  segmentId: string;
+  translation: string;
 }
 
 export interface WSMeetingCompleteMessage {
