@@ -14,7 +14,7 @@ interface RecordingSession {
   gemini: GeminiService;
   startTime: number;
   segmentCount: number;
-  pendingTranslations: Map<string, string>; // segmentId -> 翻譯結果
+  pendingTranslations: Map<string, { translation: string; segment: any }>; // segmentId -> 翻譯結果
 }
 
 const sessions = new Map<WebSocket, RecordingSession>();
