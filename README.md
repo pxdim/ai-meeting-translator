@@ -15,61 +15,71 @@
 
 - **前端**: Next.js 15 + Tailwind CSS + shadcn/ui
 - **後端**: Node.js + TypeScript + WebSocket
-- **資料庫**: SQLite (better-sqlite3)
+- **資料庫**: Supabase (PostgreSQL)
 - **AI API**:
   - Deepgram Nova-2 (語音辨識)
-  - OpenAI GPT-4o (翻譯與摘要)
+  - Google Gemini 2.0 Flash (翻譯與摘要 - 免費!)
+
+## 部署方式
+
+- **雲端部署**: [Railway](https://railway.com) ⭐ 推薦
+- **資料庫**: Supabase
+- **翻譯**: Google Gemini (免費)
 
 ## 快速開始
 
-### 1. 複製專案
+### Railway 一鍵部署 (推薦)
+
+1. 推送程式碼到 GitHub
+2. 在 Railway 從 GitHub 部署
+3. 設定環境變數：
+   - `DEEPGRAM_API_KEY`
+   - `GEMINI_API_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_KEY`
+
+詳細步驟請參考 [部署指南](./docs/deployment.md)。
+
+### 本地開發
 
 ```bash
+# 1. 複製專案
 git clone <your-repo-url>
 cd ai-meeting-translator
-```
 
-### 2. 安裝依賴
+# 2. 安裝依賴
+cd frontend && npm install
+cd ../backend && npm install
 
-```bash
-# 前端
-cd frontend
-npm install
-
-# 後端
-cd ../backend
-npm install
-```
-
-### 3. 設定環境變數
-
-```bash
+# 3. 設定環境變數
 cd backend
 cp .env.example .env
+# 編輯 .env 填入 API 金鑰
+
+# 4. 啟動服務
+npm run dev  # 後端
+# (新終端) cd frontend && npm run dev  # 前端
 ```
 
-編輯 `.env` 檔案，填入您的 API 金鑰：
+## API 金鑰取得
 
-```env
-DEEPGRAM_API_KEY=your_deepgram_api_key
-OPENAI_API_KEY=your_openai_api_key
-```
+### Deepgram (語音辨識)
 
-### 4. 啟動服務
+前往 [deepgram.com](https://deepgram.com) 註冊
+- 每月 $200 免費額度
+- Nova-2: $0.009/分鐘
 
-```bash
-# 後端 (終端 1)
-cd backend
-npm run dev
+### Google Gemini (翻譯 - 免費!)
 
-# 前端 (終端 2)
-cd frontend
-npm run dev
-```
+前往 [ai.google.dev](https://ai.google.dev) 取得 API 金鑰
+- **gemini-2.0-flash-exp**: 免費使用，極快速度
+- 每天免費 15 次/分鐘請求
 
-### 5. 開始使用
+### Supabase (資料庫 - 免費!)
 
-開啟瀏覽器訪問 http://localhost:3000
+前往 [supabase.com](https://supabase.com) 建立專案
+- 免費層：500MB 資料庫儲存
+- 東南亞區域低延遲
 
 ## 專案結構
 
@@ -77,55 +87,27 @@ npm run dev
 ai-meeting-translator/
 ├── docs/              # 專案文檔
 ├── frontend/          # Next.js 前端
-│   ├── src/
-│   │   ├── app/       # 頁面路由
-│   │   ├── components/# React 組件
-│   │   ├── lib/       # 工具函式
-│   │   └── types/     # TypeScript 類型
-│   └── package.json
 ├── backend/           # Node.js 後端
-│   ├── src/
-│   │   ├── api/       # API 整合
-│   │   ├── db/        # 資料庫
-│   │   ├── websocket/ # WebSocket 處理
-│   │   └── server.ts  # 主伺服器
-│   └── package.json
-└── docker-compose.yml # Docker 部署
+├── railway.json       # Railway 配置
+└── README.md
 ```
 
-## API 金鑰取得
+## 成本估算 (每月)
 
-### Deepgram
-
-1. 前往 [https://deepgram.com](https://deepgram.com) 註冊
-2. 建立新的 API 金鑰
-3. 每月 $200 免費額度
-
-### OpenAI
-
-1. 前往 [https://platform.openai.com](https://platform.openai.com) 註冊
-2. 建立 API 金鑰
-3. 使用 GPT-4o 進行翻譯和摘要
-
-## Docker 部署
-
-```bash
-docker-compose up -d
-```
-
-## 成本估算
-
-- **Deepgram**: $0.009/分鐘
-- **OpenAI**: 約 $0.15-0.20/小時
-- **主機**: $5-10/月
-- **總計 (20小時/月)**: 約 $20-25/月
+| 項目 | 成本 |
+|------|------|
+| Railway 主機 | $5-20 |
+| Deepgram (20小時) | ~$11 |
+| Gemini 翻譯 | $0 (免費!) |
+| Supabase 資料庫 | $0 (免費!) |
+| **總計** | **約 $16-31/月** |
 
 ## 文檔
 
 - [需求文件](./docs/requirements.md)
 - [架構設計](./docs/architecture.md)
 - [API 整合說明](./docs/api-integration.md)
-- [部署指南](./docs/deployment.md)
+- [Railway 部署指南](./docs/deployment.md)
 
 ## 授權
 

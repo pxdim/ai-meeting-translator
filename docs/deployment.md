@@ -1,233 +1,201 @@
-# 部署指南
+# Railway 部署指南
 
-## 部署選項
+本專案使用 **Railway** 進行雲端部署，整合以下服務：
+- **Deepgram** - 語音辨識
+- **Google Gemini** - 翻譯與會議摘要
+- **Supabase** - 資料庫儲存
 
-### 1. VPS 部署（推薦）
+## Railway 快速部署
 
-推薦使用的 VPS 服務：
-- DigitalOcean ($6-12/月)
-- Linode ($5/10/月)
-- AWS Lightsail ($3.5-5/月)
-- Vultr ($6/月)
-
-### 2. Docker 部署（簡化）
-
-使用 Docker Compose 一鍵部署。
-
-## Docker 部署步驟
-
-### 1. 準備伺服器
+### 1. 推送程式碼到 GitHub
 
 ```bash
-# 更新系統
-sudo apt update && sudo apt upgrade -y
-
-# 安裝 Docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-
-# 安裝 Docker Compose
-sudo apt install docker-compose -y
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin your-repo-url
+git push -u origin main
 ```
 
-### 2. 設定專案
+### 2. 在 Railway 部署後端
 
-```bash
-# 克隆專案
-git clone your-repo-url
-cd ai-meeting-translator
+1. 前往 [railway.com](https://railway.com)
+2. 點擊 **New Project** → **Deploy from GitHub repo**
+3. 選擇您的專案
+4. 選擇 `backend` 資料夾作為根目錄
+5. Railway 會自動檢測 Node.js 專案並建置
 
-# 複製環境變數檔案
-cp backend/.env.example backend/.env
+### 3. 設定環境變數
 
-# 編輯環境變數
-nano backend/.env
-```
-
-### 3. 建立並啟動服務
-
-```bash
-docker-compose up -d --build
-```
-
-### 4. 設定 Nginx（可選）
-
-```bash
-sudo apt install nginx -y
-sudo nano /etc/nginx/sites-available/ai-meeting
-```
-
-Nginx 配置：
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    # 前端靜態檔案
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # 後端 API
-    location /api/ {
-        proxy_pass http://localhost:3001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-
-        # WebSocket 支援
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
-
-```bash
-# 啟用配置
-sudo ln -s /etc/nginx/sites-available/ai-meeting /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl restart nginx
-```
-
-### 5. SSL 證書（推薦）
-
-```bash
-sudo apt install certbot python3-certbot-nginx -y
-sudo certbot --nginx -d your-domain.com
-```
-
-## 環境變數
-
-### 後端 (.env)
+在 Railway 專案設定中加入以下環境變數：
 
 ```env
-# 伺服器設定
 NODE_ENV=production
 PORT=3001
 
-# API 金鑰
+# Deepgram API
 DEEPGRAM_API_KEY=your_deepgram_api_key
-OPENAI_API_KEY=your_openai_api_key
 
-# 資料庫
-DATABASE_PATH=/app/data/meetings.db
+# Google Gemini API
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash-exp
 
-# 儲存路徑
-RECORDINGS_PATH=/app/storage/recordings
+# Supabase
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_SERVICE_KEY=your_supabase_service_role_key
 
-# CORS（如果需要）
-CORS_ORIGIN=https://your-domain.com
+CORS_ORIGIN=*
 ```
 
-## 監控與維護
+### 4. 部署前端
 
-### 檢查日誌
+1. 在 Railway 專案中新增一個 **Service**
+2. 選擇 **Deploy from GitHub repo**
+3. 選擇 `frontend` 資料夾
+4. 設定環境變數：
+   ```env
+   NEXT_PUBLIC_WS_URL=your-backend-railway-url
+   ```
 
-```bash
-# 查看所有服務日誌
-docker-compose logs -f
+### 5. 設定自訂域名（可選）
 
-# 查看特定服務
-docker-compose logs -f frontend
-docker-compose logs -f backend
+1. 在 Railway 專案設定中
+2. 點擊 **Settings** → **Domains**
+3. 新增您的域名
+4. 按照指示設定 DNS
+
+## Supabase 設定
+
+### 1. 建立 Supabase 專案
+
+1. 前往 [supabase.com](https://supabase.com)
+2. 點擊 **New Project**
+3. 設定專案名稱和資料庫密碼
+4. 選擇離您最近的區域（建議：Southeast Asia for Taiwan）
+
+### 2. 建立資料表
+
+在 Supabase SQL Editor 中執行：
+
+```sql
+-- 會議表
+CREATE TABLE meetings (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT '會議記錄',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  duration INTEGER DEFAULT 0,
+  audio_path TEXT NOT NULL,
+  summary TEXT,
+  action_items TEXT
+);
+
+-- 逐字稿片段表
+CREATE TABLE transcript_segments (
+  id TEXT PRIMARY KEY,
+  meeting_id TEXT NOT NULL,
+  start_time REAL NOT NULL,
+  end_time REAL NOT NULL,
+  text_zh TEXT NOT NULL,
+  text_en TEXT NOT NULL,
+  confidence REAL NOT NULL,
+  speaker TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (meeting_id) REFERENCES meetings(id) ON DELETE CASCADE
+);
+
+-- 索引
+CREATE INDEX idx_meeting_segments ON transcript_segments(meeting_id);
+CREATE INDEX idx_meeting_created_at ON meetings(created_at DESC);
+
+-- 啟用 RLS (可選，個人使用可不啟用)
+ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE transcript_segments ENABLE ROW LEVEL SECURITY;
 ```
 
-### 重啟服務
+### 3. 取得連線資訊
 
-```bash
-docker-compose restart
-```
+在 Supabase 專案設定中：
+- **Project URL** → 設定為 `SUPABASE_URL`
+- **service_role** Key → 設定為 `SUPABASE_SERVICE_KEY`
 
-### 更新部署
+## Google Gemini API
 
-```bash
-git pull
-docker-compose up -d --build
-```
+### 1. 取得 API 金鑰
 
-### 備份
+1. 前往 [ai.google.dev](https://ai.google.dev)
+2. 點擊 **Get API Key**
+3. 建立 API 金鑰
 
-```bash
-# 備份資料庫和錄音檔案
-tar -czf backup-$(date +%Y%m%d).tar.gz backend/data backend/storage/recordings
+### 2. 推薦模型
 
-# 上傳到雲端儲存（可選）
-# scp backup-*.tar.gz user@backup-server:/backups/
-```
+| 模型 | 速度 | 成本 | 推薦用途 |
+|------|------|------|----------|
+| `gemini-2.0-flash-exp` | ⚡ 最快 | 免費 | 即時翻譯（推薦） |
+| `gemini-1.5-flash` | ⚡ 快 | 低 | 批次翻譯 |
+| `gemini-1.5-pro` | 🐢 中等 | 中 | 會議摘要 |
 
-## 安全建議
+免費額度：
+- gemini-2.0-flash-exp: 每天免費 15 次/分鐘請求
+- gemini-1.5-flash: 每天 1000 次請求
 
-### 1. 防火牆設定
+## Deepgram API
 
-```bash
-sudo ufw allow 22    # SSH
-sudo ufw allow 80    # HTTP
-sudo ufw allow 443   # HTTPS
-sudo ufw enable
-```
+### 1. 取得 API 金鑰
 
-### 2. 密碼保護（可選）
+1. 前往 [deepgram.com](https://deepgram.com)
+2. 註冊並建立 API 金鑰
+3. 每月 $200 免費額度
 
-如果需要在公開網路上使用，建議加入簡單的密碼保護：
+### 2. 費用
 
-```typescript
-// backend/src/middleware/auth.ts
-export function authMiddleware(req: any, res: any, next: any) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || authHeader !== `Bearer ${process.env.ACCESS_TOKEN}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  next();
-}
-```
-
-### 3. 限流
-
-```bash
-# 使用 nginx 限流
-limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
-```
-
-## 故障排除
-
-### 無法連線
-
-1. 檢查防火牆設定
-2. 確認 Docker 容器正在運行
-3. 查看 Nginx 日誌
-
-### WebSocket 連線失敗
-
-1. 確認 Nginx 配置中的 WebSocket 升級設定
-2. 檢查 CORS 設定
-
-### API 錯誤
-
-1. 驗證 API 金鑰正確
-2. 檢查 API 使用量限制
-3. 查看後端日誌
+- Nova-2: $0.009/分鐘
+- 60 分鐘會議: $0.54
+- 每月 20 小時: 約 $10.80
 
 ## 成本估算
 
-### VPS 主機
+### Railway 主機
 
-- **DigitalOcean**: $6/月 (1GB RAM, 1 vCPU)
-- **AWS Lightsail**: $5/月 (512MB RAM, 1 vCPU)
-- **Linode**: $5/月 (1GB RAM, 1 vCPU)
+- **免費層**: $5/月 (限額)
+- **付費**: 從 $20/月起
 
 ### API 成本
 
-- **Deepgram**: $0.54/小時
-- **OpenAI**: $0.15-0.20/小時
-- **每月 20 小時**: 約 $15
+| 服務 | 每小時 | 20小時/月 |
+|------|--------|------------|
+| Deepgram | $0.54 | $10.80 |
+| Gemini | $0 (免費) | $0 |
+| Supabase 免費層 | - | $0 |
 
-### 總計
+### 總成本
 
-- **主機**: $5-10/月
-- **API**: $15/月
-- **總成本**: $20-25/月
+- **主機**: $5-20/月
+- **API**: 約 $11/月
+- **總計**: **約 $16-31/月**
+
+## 監控與日誌
+
+在 Railway 中：
+- **Metrics**: 查看 CPU、記憶體使用
+- **Logs**: 查看應用程式日誌
+- **Deployments**: 查看部署歷史
+
+## 故障排除
+
+### 資料庫連線失敗
+
+1. 檢查 `SUPABASE_URL` 和 `SUPABASE_SERVICE_KEY`
+2. 確認 Supabase 專案未暫停
+3. 驗證資料表已正確建立
+
+### Gemini API 失敗
+
+1. 確認 `GEMINI_API_KEY` 正確
+2. 檢查 API 配額是否用盡
+3. 考慮切換到其他模型
+
+### Railway 建置失敗
+
+1. 檢查 `package.json` 腳本
+2. 查看建置日誌
+3. 確認 TypeScript 編譯成功

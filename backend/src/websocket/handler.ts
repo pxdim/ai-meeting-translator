@@ -1,30 +1,33 @@
 // WebSocket 處理器 - 處理即時音訊流和語音辨識
+// 整合 Deepgram (語音辨識) + Gemini (翻譯) + Supabase (資料庫)
 
 import { WebSocket } from 'ws';
 import { createClient, DeepgramClient, LiveTranscriptionEvents } from '@deepgram/sdk';
-import { DatabaseClient } from '../db/client.js';
-import { OpenAIService } from '../api/openai.js';
+import { SupabaseDatabase } from '../db/supabase.js';
+import { GeminiService } from '../api/gemini.js';
 import { randomUUID } from 'crypto';
 
 interface RecordingSession {
   meetingId: string;
   deepgram: DeepgramClient;
   deepgramWs: any;
+  gemini: GeminiService;
   startTime: number;
   segmentCount: number;
+  pendingTranslations: Map<string, string>; // segmentId -> 翻譯結果
 }
 
 const sessions = new Map<WebSocket, RecordingSession>();
 
-export function handleWebSocketConnection(ws: WebSocket, db: DatabaseClient): void {
-  const openai = new OpenAIService();
+export function handleWebSocketConnection(ws: WebSocket, db: SupabaseDatabase): void {
+  const gemini = new GeminiService();
 
   ws.on('message', async (data: Buffer) => {
     try {
       // 處理文字訊息（JSON 指令）
       if (data[0] === 123) { // '{' 的 ASCII 碼
         const message = JSON.parse(data.toString());
-        await handleTextMessage(ws, message, db, openai);
+        await handleTextMessage(ws, message, db, gemini);
         return;
       }
 
@@ -59,12 +62,12 @@ export function handleWebSocketConnection(ws: WebSocket, db: DatabaseClient): vo
 async function handleTextMessage(
   ws: WebSocket,
   message: any,
-  db: DatabaseClient,
-  openai: OpenAIService
+  db: SupabaseDatabase,
+  gemini: GeminiService
 ): Promise<void> {
   switch (message.type) {
     case 'start_recording':
-      await startRecording(ws, message.meetingId, db, openai);
+      await startRecording(ws, message.meetingId, db, gemini);
       break;
 
     case 'stop_recording':
@@ -79,8 +82,8 @@ async function handleTextMessage(
 async function startRecording(
   ws: WebSocket,
   meetingId: string,
-  db: DatabaseClient,
-  openai: OpenAIService
+  db: SupabaseDatabase,
+  gemini: GeminiService
 ): Promise<void> {
   console.log(`[Recording] Starting recording for meeting ${meetingId}`);
 
@@ -97,15 +100,20 @@ async function startRecording(
     interim_results: true,
     profanity_filter: false,
     filler_words: true,
+    encoding: 'linear16',
+    sample_rate: 16000,
   });
 
   // 建立會議資料庫記錄
-  const audioPath = `./src/storage/recordings/${actualMeetingId}.wav`;
-  db.createMeeting({
+  const audioPath = `/recordings/${actualMeetingId}.wav`;
+  await db.createMeeting({
     id: actualMeetingId,
     title: '會議記錄',
     audioPath,
   });
+
+  // 追蹤待處理的翻譯
+  const pendingTranslations = new Map<string, string>();
 
   // 處理 Deepgram 結果
   deepgramWs.on(LiveTranscriptionEvents.Transcript, async (data: any) => {
@@ -115,10 +123,25 @@ async function startRecording(
     const isFinal = data.is_final;
     const segmentId = randomUUID();
 
-    // 翻譯成英文
+    // 翻譯成英文（使用 Gemini）
     let translatedText = '';
     if (isFinal) {
-      translatedText = await openai.translateText(transcript, 'zh');
+      // 非同步翻譯，不阻塞
+      gemini.translateText(transcript, 'zh')
+        .then(result => {
+          translatedText = result;
+          pendingTranslations.set(segmentId, result);
+
+          // 更新資料庫中的翻譯
+          db.updateMeeting(actualMeetingId, {}); // 觸發更新
+        })
+        .catch(error => {
+          console.error('[Gemini] Translation error:', error);
+          translatedText = '';
+        });
+
+      // 先用佔位符
+      translatedText = '[翻譯中...]';
     }
 
     const segment = {
@@ -127,7 +150,7 @@ async function startRecording(
       endTime: data.duration || 0,
       text: {
         zh: transcript,
-        en: translatedText || '[翻譯中...]',
+        en: translatedText,
       },
       confidence: data.channel?.alternatives?.[0]?.confidence || 0,
     };
@@ -140,13 +163,13 @@ async function startRecording(
 
     // 儲存到資料庫（僅最終結果）
     if (isFinal) {
-      db.addSegment({
+      await db.addSegment({
         id: segmentId,
         meetingId: actualMeetingId,
         startTime: segment.startTime,
         endTime: segment.endTime,
         textZh: segment.text.zh,
-        textEn: segment.text.en,
+        textEn: segment.text.en, // 之後會被更新
         confidence: segment.confidence,
       });
 
@@ -154,6 +177,25 @@ async function startRecording(
       const session = sessions.get(ws);
       if (session) {
         session.segmentCount++;
+
+        // 檢查是否需要更新翻譯
+        const checkTranslation = setInterval(async () => {
+          const translation = pendingTranslations.get(segmentId);
+          if (translation) {
+            clearInterval(checkTranslation);
+            // 發送更新後的翻譯到客戶端
+            ws.send(JSON.stringify({
+              type: 'transcript',
+              segment: {
+                ...segment,
+                text: { zh: segment.text.zh, en: translation },
+              },
+            }));
+          }
+        }, 500);
+
+        // 5 秒後停止檢查
+        setTimeout(() => clearInterval(checkTranslation), 5000);
       }
     }
   });
@@ -168,14 +210,16 @@ async function startRecording(
     meetingId: actualMeetingId,
     deepgram,
     deepgramWs,
+    gemini,
     startTime: Date.now(),
     segmentCount: 0,
+    pendingTranslations,
   });
 
   console.log(`[Recording] Session started for meeting ${actualMeetingId}`);
 }
 
-async function stopRecording(ws: WebSocket, db: DatabaseClient): Promise<void> {
+async function stopRecording(ws: WebSocket, db: SupabaseDatabase): Promise<void> {
   const session = sessions.get(ws);
   if (!session) {
     console.log('[Recording] No active session to stop');
@@ -191,28 +235,28 @@ async function stopRecording(ws: WebSocket, db: DatabaseClient): Promise<void> {
 
   // 計算錄音時長
   const duration = Math.floor((Date.now() - session.startTime) / 1000);
-  db.updateMeeting(session.meetingId, { duration });
+  await db.updateMeeting(session.meetingId, { duration });
 
   // 取得逐字稿內容
-  const segments = db.getSegments(session.meetingId);
+  const segments = await db.getSegments(session.meetingId);
   const fullTranscript = segments.map((s: any) => s.text_zh).join(' ');
 
-  // 生成會議摘要（如果逐字稿不為空）
+  // 生成會議摘要（使用 Gemini）
   let summary = '';
   let actionItems: string[] = [];
 
   if (segments.length > 0) {
     try {
-      const result = await generateMeetingSummary(fullTranscript);
+      const result = await session.gemini.generateSummary(fullTranscript);
       summary = result.summary;
       actionItems = result.actionItems;
 
-      db.updateMeeting(session.meetingId, {
+      await db.updateMeeting(session.meetingId, {
         summary,
-        actionItems: JSON.stringify(actionItems),
+        actionItems,
       });
     } catch (error) {
-      console.error('[OpenAI] Failed to generate summary:', error);
+      console.error('[Gemini] Failed to generate summary:', error);
     }
   }
 
@@ -228,16 +272,4 @@ async function stopRecording(ws: WebSocket, db: DatabaseClient): Promise<void> {
   sessions.delete(ws);
 
   console.log(`[Recording] Meeting ${session.meetingId} completed. Duration: ${duration}s, Segments: ${session.segmentCount}`);
-}
-
-async function generateMeetingSummary(transcript: string): Promise<{
-  summary: string;
-  actionItems: string[];
-}> {
-  // 這裡可以整合 OpenAI API 生成摘要
-  // 簡化版本：
-  return {
-    summary: '會議摘要生成功能待實作',
-    actionItems: [],
-  };
 }

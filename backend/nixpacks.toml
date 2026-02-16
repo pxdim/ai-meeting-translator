@@ -1,0 +1,14 @@
+# Nixpacks 配置用於 Railway 部署
+
+[phases.build]
+cmds = ["npm run build"]
+
+[phases.start]
+cmds = ["node dist/server.js"]
+
+[start]
+cmd = "node dist/server.js"
+
+[variables]
+NODE_ENV = "production"
+PORT = "3001"

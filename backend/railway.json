@@ -1,0 +1,11 @@
+# Railwa y 配置
+# https://railway.com/template/IxMBtD
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "node dist/server.js"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
