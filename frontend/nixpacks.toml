@@ -2,4 +2,4 @@
 cmd = "npm run build"
 
 [phases.start]
-cmd = "node dist/server.js"
+cmd = "npm start"
