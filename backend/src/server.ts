@@ -32,6 +32,12 @@ try {
 
 // 建立 HTTP 伺服器
 const server = createServer(async (req, res) => {
+  // 處理 WebSocket 升級請求
+  if (req.url === '/ws' && req.headers.upgrade?.toLowerCase() === 'websocket') {
+    // 讓 WebSocket Server 處理
+    return;
+  }
+
   // 處理 CORS
   const origin = process.env.CORS_ORIGIN || '*';
   res.setHeader('Access-Control-Allow-Origin', origin);
