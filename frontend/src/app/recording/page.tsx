@@ -13,7 +13,10 @@ import { AudioRecorder } from '@/lib/audio-recorder';
 import type { TranscriptSegment, WSMessage, WSTranscriptMessage, WSTranscriptUpdateMessage } from '@/types/meeting';
 import { ArrowLeft, Pause, Play } from 'lucide-react';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3001/';
+
+// 如果 URL 沒有以 /ws 或 / 結尾，添加 /
+const formattedWsUrl = WS_URL.endsWith('/') || WS_URL.endsWith('/ws') ? WS_URL : `${WS_URL}/`;
 
 export default function RecordingPage() {
   const router = useRouter();
@@ -32,7 +35,7 @@ export default function RecordingPage() {
   // 初始化 WebSocket 和 AudioRecorder
   useEffect(() => {
     const ws = new WebSocketClient({
-      url: WS_URL,
+      url: formattedWsUrl,
       onMessage: handleWSMessage,
       onStatusChange: setConnectionStatus,
       onError: (error) => console.error('WebSocket error:', error),
