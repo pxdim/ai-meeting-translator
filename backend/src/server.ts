@@ -32,9 +32,9 @@ try {
 
 // 建立 HTTP 伺服器
 const server = createServer(async (req, res) => {
-  // 處理 WebSocket 升級請求
-  if (req.url === '/ws' && req.headers.upgrade?.toLowerCase() === 'websocket') {
-    // 讓 WebSocket Server 處理
+  // ===== Railway WebSocket 修復：確保升級請求不被 HTTP 處理 =====
+  if (req.headers.upgrade?.toLowerCase() === 'websocket') {
+    // 讓 upgrade 事件處理器接管，不要發送 HTTP 響應
     return;
   }
 
@@ -197,11 +197,19 @@ const server = createServer(async (req, res) => {
   res.end(JSON.stringify({ error: 'Not found' }));
 });
 
-// 處理 WebSocket 升級請求
+// 處理 WebSocket 升級請求 - Railway 修復版
 server.on('upgrade', (request, socket, head) => {
   try {
     const { pathname } = new URL(request.url || '', `http://${request.headers.host}`);
 
+    console.log('[Server] Upgrade request received:', {
+      url: request.url,
+      pathname,
+      upgrade: request.headers.upgrade,
+      'sw-version': request.headers['sec-websocket-version']
+    });
+
+    // 接受根路徑和 /ws 路徑的 WebSocket 升級
     if (pathname === '/' || pathname === '/ws') {
       wss.handleUpgrade(request, socket as any, head, (ws) => {
         wss.emit('connection', ws, request);
@@ -215,28 +223,40 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 // 建立 WebSocket 伺服器 (使用 noServer 手動處理升級)
-const wss = new WebSocketServer({ noServer: true, path: '/' });
+const wss = new WebSocketServer({
+  noServer: true,
+  path: '/',
+  clientTracking: true,  // 追蹤客戶端連接
+  maxPayload: 16 * 1024 * 1024  // 16MB 最大負載，用於音頻數據
+});
 
 // WebSocket 連線處理
 wss.on('connection', (ws: WebSocket, req) => {
-  console.log(`[WebSocket] New connection from ${req.socket.remoteAddress}`);
+  const clientIp = req.socket.remoteAddress;
+  console.log(`[WebSocket] New connection from ${clientIp}`);
+  console.log(`[WebSocket] Total clients: ${wss.clients.size}`);
 
   // 傳送連線成功訊息
   ws.send(JSON.stringify({
     type: 'status',
-    status: 'connected'
+    status: 'connected',
+    timestamp: new Date().toISOString()
   }));
 
   // 委派給 handler 處理
   handleWebSocketConnection(ws, db);
+
+  ws.on('close', () => {
+    console.log(`[WebSocket] Client disconnected. Remaining: ${wss.clients.size}`);
+  });
 });
 
 wss.on('error', (error) => {
   console.error('[WebSocket] Server error:', error);
 });
 
-// 啟動伺服器
-server.listen(PORT, () => {
+// 啟動伺服器 - 綁定到所有網路接口 (Railway 需要)
+server.listen(Number(PORT), '0.0.0.0', () => {
   const isRailway = process.env.RAILWAY_ENVIRONMENT || process.env.RAILWAY_PUBLIC_DOMAIN;
   const environment = isRailway ? 'Railway' : (process.env.NODE_ENV || 'development');
 
@@ -244,8 +264,8 @@ server.listen(PORT, () => {
 ╔════════════════════════════════════════════════════════════╗
 ║           AI 會議翻譯系統 - 後端伺服器                        ║
 ╠════════════════════════════════════════════════════════════╣
-║  HTTP Server:  http://localhost:${PORT}                      ║
-║  WebSocket:    ws://localhost:${PORT}/ws                     ║
+║  HTTP Server:  http://0.0.0.0:${PORT}                      ║
+║  WebSocket:    ws://0.0.0.0:${PORT}/ws                     ║
 ║                                                               ║
 ║  Environment:  ${environment.padEnd(22)}                    ║
 ║  Database:     Supabase                                       ║
