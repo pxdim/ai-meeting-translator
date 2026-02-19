@@ -1,0 +1,26 @@
+# Caddy Reverse Proxy for AI Meeting Translator
+# Handles WebSocket connections correctly
+
+:443 {
+    # WebSocket 端點
+    handle /ws /ws/* {
+        reverse_proxy backend-production-6f7b.up.railway.app:443 {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # 根路徑 WebSocket
+    handle /* {
+        reverse_proxy backend-production-6f7b.up.railway.app:443 {
+            header_up Host {upstream_hostport}
+            header_up X-Forwarded-Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}

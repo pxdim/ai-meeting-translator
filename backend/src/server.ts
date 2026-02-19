@@ -50,6 +50,25 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // 根路徑返回服務信息
+  if (req.url === '/') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      service: 'AI Meeting Translator Backend',
+      version: '1.0.0',
+      websocket: {
+        path: '/ws',
+        status: 'supported'
+      },
+      endpoints: {
+        health: '/health',
+        api: '/api/meetings',
+        websocket: '/ws'
+      }
+    }));
+    return;
+  }
+
   // 健康檢查
   if (req.url === '/health') {
     try {
